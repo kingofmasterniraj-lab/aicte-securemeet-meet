@@ -8,7 +8,10 @@ const app = express();
 const server = http.createServer(app);
 
 const io = new Server(server, {
-  cors: { origin: true, methods: ["GET", "POST"] },
+  cors: {
+    origin: true,
+    methods: ["GET", "POST"]
+  },
   transports: ["websocket", "polling"]
 });
 
@@ -16,139 +19,53 @@ const PORT = process.env.PORT || 3000;
 const meetings = new Map();
 
 app.use(express.json());
-app.use((req, res) => {
-  res.sendFile(
-    path.join(__dirname, "public")
-  );
-});
+app.use(express.static(path.join(__dirname, "public")));
 
 function makeMeetingId() {
   return crypto.randomBytes(4).toString("hex").toUpperCase();
 }
+
 function safeName(name, fallback = "Participant") {
-  return String(name || fallback).trim().slice(0, 80) || fallback;
+  const value = String(name || "").trim();
+  return value.slice(0, 80) || fallback;
 }
+
 function getMeeting(socket) {
   const id = socket.data.meetingId;
   return id ? meetings.get(id) : null;
 }
 
-io.on("connection", socket => {
-  socket.on("list-meetings", cb => {
-    const list = [...meetings.values()].map(m => ({
-      id: m.id, title: m.title, hostName: m.hostName,
-      participantCount: m.participants.size
+function meetingParticipants(meeting, excludeSocketId = null) {
+  return Array.from(meeting.participants.entries())
+    .filter(([socketId]) => socketId !== excludeSocketId)
+    .map(([socketId, user]) => ({
+      socketId,
+      name: user.name,
+      role: user.role
     }));
-    if (typeof cb === "function") cb(list);
-  });
-
-  socket.on("create-meeting", ({ name, title }, cb) => {
-    let id;
-    do id = makeMeetingId(); while (meetings.has(id));
-    const hostName = safeName(name, "Admin");
-    const meeting = {
-      id, title: safeName(title, "AICTE Secure Meeting"),
-      hostSocket: socket.id, hostName,
-      participants: new Map([[socket.id, { name: hostName, role: "Admin" }]])
-    };
-    meetings.set(id, meeting);
-    socket.join(id);
-    socket.data.meetingId = id;
-    socket.data.name = hostName;
-    socket.data.role = "Admin";
-    cb?.({ ok: true, meetingId: id, title: meeting.title });
-  });
-
-  socket.on("join-meeting", ({ meetingId, name }, cb) => {
-    const id = String(meetingId || "").trim().toUpperCase();
-    const meeting = meetings.get(id);
-    if (!meeting) return cb?.({ ok: false, error: "Meeting not found or has ended." });
-
-    if (socket.data.meetingId && socket.data.meetingId !== id) removeSocket(socket);
-
-    const participantName = safeName(name);
-    const participants = [...meeting.participants.entries()]
-      .filter(([sid]) => sid !== socket.id)
-      .map(([socketId, u]) => ({ socketId, name: u.name, role: u.role }));
-
-    meeting.participants.set(socket.id, { name: participantName, role: "Participant" });
-    socket.join(id);
-    socket.data.meetingId = id;
-    socket.data.name = participantName;
-    socket.data.role = "Participant";
-
-    cb?.({
-      ok: true, meetingId: id, title: meeting.title,
-      hostSocket: meeting.hostSocket, hostName: meeting.hostName,
-      participants
-    });
-
-    socket.to(id).emit("participant-joined", {
-      socketId: socket.id, name: participantName, role: "Participant"
-    });
-  });
-
-  // WebRTC signaling: target is always another socket in the same meeting.
-  socket.on("offer", ({ target, offer }) => {
-    if (!target || !offer || !getMeeting(socket)) return;
-    io.to(target).emit("offer", { sender: socket.id, offer });
-  });
-  socket.on("answer", ({ target, answer }) => {
-    if (!target || !answer || !getMeeting(socket)) return;
-    io.to(target).emit("answer", { sender: socket.id, answer });
-  });
-  socket.on("ice-candidate", ({ target, candidate }) => {
-    if (!target || !candidate || !getMeeting(socket)) return;
-    io.to(target).emit("ice-candidate", { sender: socket.id, candidate });
-  });
-
-  socket.on("chat-message", ({ message }) => {
-    const meeting = getMeeting(socket);
-    if (!meeting) return;
-    const text = String(message || "").trim().slice(0, 1000);
-    if (!text) return;
-    io.to(meeting.id).emit("chat-message", {
-      sender: socket.data.name || "User", socketId: socket.id,
-      message: text, time: Date.now()
-    });
-  });
-
-  socket.on("leave-meeting", () => removeSocket(socket));
-
-  socket.on("end-meeting", () => {
-    const meeting = getMeeting(socket);
-    if (!meeting || meeting.hostSocket !== socket.id) return;
-
-    io.to(meeting.id).emit("meeting-ended");
-    for (const [sid] of meeting.participants) {
-      const s = io.sockets.sockets.get(sid);
-      if (s) {
-        s.data.meetingId = null;
-        s.leave(meeting.id);
-      }
-    }
-    meetings.delete(meeting.id);
-    socket.data.meetingId = null;
-  });
-
-  socket.on("disconnect", () => removeSocket(socket));
-});
+}
 
 function removeSocket(socket) {
   const meetingId = socket.data.meetingId;
-  if (!meetingId) return;
+
+  if (!meetingId) {
+    return;
+  }
 
   const meeting = meetings.get(meetingId);
+
   if (!meeting) {
     socket.data.meetingId = null;
     return;
   }
 
   const wasHost = meeting.hostSocket === socket.id;
+
   meeting.participants.delete(socket.id);
 
   socket.to(meetingId).emit("participant-left", {
-    socketId: socket.id, name: socket.data.name || "Participant"
+    socketId: socket.id,
+    name: socket.data.name || "Participant"
   });
 
   socket.leave(meetingId);
@@ -157,18 +74,517 @@ function removeSocket(socket) {
   if (wasHost) {
     io.to(meetingId).emit("meeting-ended");
     meetings.delete(meetingId);
+  } else {
+    io.to(meetingId).emit("meeting-updated", {
+      id: meeting.id,
+      participantCount: meeting.participants.size
+    });
   }
 }
 
-app.get("/health", (req, res) => res.json({
-  status: "ok", service: "AICTE SecureMeet",
-  time: new Date().toISOString(), meetings: meetings.size
-}));
+io.on("connection", (socket) => {
 
-app.use((req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+  console.log("Socket connected:", socket.id);
+
+  // --------------------------------------------------
+  // LIST ACTIVE MEETINGS
+  // --------------------------------------------------
+
+  socket.on("list-meetings", (callback) => {
+
+    const list = Array.from(meetings.values()).map((meeting) => ({
+      id: meeting.id,
+      title: meeting.title,
+      hostName: meeting.hostName,
+      participantCount: meeting.participants.size
+    }));
+
+    if (typeof callback === "function") {
+      callback(list);
+    }
+  });
+
+  // --------------------------------------------------
+  // CREATE MEETING
+  // --------------------------------------------------
+
+  socket.on("create-meeting", (data = {}, callback) => {
+
+    try {
+
+      if (socket.data.meetingId) {
+        removeSocket(socket);
+      }
+
+      let meetingId;
+
+      do {
+        meetingId = makeMeetingId();
+      } while (meetings.has(meetingId));
+
+      const hostName = safeName(
+        data.name,
+        "AICTE Administrator"
+      );
+
+      const title = safeName(
+        data.title,
+        "AICTE Secure Meeting"
+      );
+
+      const meeting = {
+        id: meetingId,
+        title,
+        hostSocket: socket.id,
+        hostName,
+        createdAt: Date.now(),
+
+        participants: new Map()
+      };
+
+      // IMPORTANT:
+      // Admin is also stored as a participant.
+      meeting.participants.set(socket.id, {
+        name: hostName,
+        role: "Admin"
+      });
+
+      meetings.set(meetingId, meeting);
+
+      socket.join(meetingId);
+
+      socket.data.meetingId = meetingId;
+      socket.data.name = hostName;
+      socket.data.role = "Admin";
+
+      console.log(
+        `Meeting created: ${meetingId} by ${hostName}`
+      );
+
+      if (typeof callback === "function") {
+        callback({
+          ok: true,
+          meetingId,
+          title,
+          hostSocket: socket.id,
+          hostName,
+          participants: []
+        });
+      }
+
+      // Tell every connected client that a new
+      // meeting is now available.
+      io.emit("meeting-created", {
+        id: meetingId,
+        title,
+        hostName,
+        participantCount: 1
+      });
+
+    } catch (error) {
+
+      console.error(
+        "CREATE MEETING ERROR:",
+        error
+      );
+
+      if (typeof callback === "function") {
+        callback({
+          ok: false,
+          error: "Unable to create meeting."
+        });
+      }
+    }
+  });
+
+  // --------------------------------------------------
+  // JOIN MEETING
+  // --------------------------------------------------
+
+  socket.on("join-meeting", (data = {}, callback) => {
+
+    try {
+
+      const meetingId = String(
+        data.meetingId || ""
+      )
+        .trim()
+        .toUpperCase();
+
+      if (!meetingId) {
+        callback?.({
+          ok: false,
+          error: "Meeting ID is required."
+        });
+        return;
+      }
+
+      const meeting = meetings.get(meetingId);
+
+      if (!meeting) {
+        callback?.({
+          ok: false,
+          error: "Meeting not found or has ended."
+        });
+        return;
+      }
+
+      if (
+        socket.data.meetingId &&
+        socket.data.meetingId !== meetingId
+      ) {
+        removeSocket(socket);
+      }
+
+      const participantName = safeName(
+        data.name,
+        "Participant"
+      );
+
+      const existingParticipants =
+        meetingParticipants(
+          meeting,
+          socket.id
+        );
+
+      meeting.participants.set(socket.id, {
+        name: participantName,
+        role: "Participant"
+      });
+
+      socket.join(meetingId);
+
+      socket.data.meetingId = meetingId;
+      socket.data.name = participantName;
+      socket.data.role = "Participant";
+
+      console.log(
+        `${participantName} joined ${meetingId}`
+      );
+
+      callback?.({
+        ok: true,
+        meetingId,
+        title: meeting.title,
+        hostSocket: meeting.hostSocket,
+        hostName: meeting.hostName,
+        participants: existingParticipants
+      });
+
+      socket.to(meetingId).emit(
+        "participant-joined",
+        {
+          socketId: socket.id,
+          name: participantName,
+          role: "Participant"
+        }
+      );
+
+      io.to(meetingId).emit(
+        "meeting-updated",
+        {
+          id: meeting.id,
+          participantCount:
+            meeting.participants.size
+        }
+      );
+
+    } catch (error) {
+
+      console.error(
+        "JOIN MEETING ERROR:",
+        error
+      );
+
+      callback?.({
+        ok: false,
+        error: "Unable to join meeting."
+      });
+    }
+  });
+
+  // --------------------------------------------------
+  // WEBRTC OFFER
+  // --------------------------------------------------
+
+  socket.on(
+    "offer",
+    ({ target, offer } = {}) => {
+
+      const meeting = getMeeting(socket);
+
+      if (!meeting || !target || !offer) {
+        return;
+      }
+
+      const targetSocket =
+        io.sockets.sockets.get(target);
+
+      if (!targetSocket) {
+        return;
+      }
+
+      if (
+        targetSocket.data.meetingId !==
+        socket.data.meetingId
+      ) {
+        return;
+      }
+
+      targetSocket.emit("offer", {
+        sender: socket.id,
+        offer
+      });
+    }
+  );
+
+  // --------------------------------------------------
+  // WEBRTC ANSWER
+  // --------------------------------------------------
+
+  socket.on(
+    "answer",
+    ({ target, answer } = {}) => {
+
+      const meeting = getMeeting(socket);
+
+      if (!meeting || !target || !answer) {
+        return;
+      }
+
+      const targetSocket =
+        io.sockets.sockets.get(target);
+
+      if (!targetSocket) {
+        return;
+      }
+
+      if (
+        targetSocket.data.meetingId !==
+        socket.data.meetingId
+      ) {
+        return;
+      }
+
+      targetSocket.emit("answer", {
+        sender: socket.id,
+        answer
+      });
+    }
+  );
+
+  // --------------------------------------------------
+  // WEBRTC ICE
+  // --------------------------------------------------
+
+  socket.on(
+    "ice-candidate",
+    ({ target, candidate } = {}) => {
+
+      const meeting = getMeeting(socket);
+
+      if (!meeting || !target || !candidate) {
+        return;
+      }
+
+      const targetSocket =
+        io.sockets.sockets.get(target);
+
+      if (!targetSocket) {
+        return;
+      }
+
+      if (
+        targetSocket.data.meetingId !==
+        socket.data.meetingId
+      ) {
+        return;
+      }
+
+      targetSocket.emit(
+        "ice-candidate",
+        {
+          sender: socket.id,
+          candidate
+        }
+      );
+    }
+  );
+
+  // --------------------------------------------------
+  // CHAT
+  // --------------------------------------------------
+
+  socket.on(
+    "chat-message",
+    ({ message } = {}) => {
+
+      const meeting = getMeeting(socket);
+
+      if (!meeting) {
+        return;
+      }
+
+      const text = String(
+        message || ""
+      )
+        .trim()
+        .slice(0, 1000);
+
+      if (!text) {
+        return;
+      }
+
+      io.to(meeting.id).emit(
+        "chat-message",
+        {
+          sender:
+            socket.data.name ||
+            "User",
+
+          socketId: socket.id,
+
+          message: text,
+
+          time: Date.now()
+        }
+      );
+    }
+  );
+
+  // --------------------------------------------------
+  // LEAVE
+  // --------------------------------------------------
+
+  socket.on(
+    "leave-meeting",
+    () => {
+      removeSocket(socket);
+    }
+  );
+
+  // --------------------------------------------------
+  // ADMIN ENDS MEETING
+  // --------------------------------------------------
+
+  socket.on(
+    "end-meeting",
+    () => {
+
+      const meeting =
+        getMeeting(socket);
+
+      if (!meeting) {
+        return;
+      }
+
+      if (
+        meeting.hostSocket !==
+        socket.id
+      ) {
+        return;
+      }
+
+      io.to(meeting.id).emit(
+        "meeting-ended"
+      );
+
+      for (
+        const [socketId]
+        of meeting.participants
+      ) {
+
+        const participantSocket =
+          io.sockets.sockets.get(
+            socketId
+          );
+
+        if (participantSocket) {
+
+          participantSocket.data.meetingId =
+            null;
+
+          participantSocket.leave(
+            meeting.id
+          );
+        }
+      }
+
+      meetings.delete(
+        meeting.id
+      );
+
+      socket.data.meetingId = null;
+
+      console.log(
+        `Meeting ended: ${meeting.id}`
+      );
+    }
+  );
+
+  // --------------------------------------------------
+  // DISCONNECT
+  // --------------------------------------------------
+
+  socket.on(
+    "disconnect",
+    (reason) => {
+
+      console.log(
+        "Socket disconnected:",
+        socket.id,
+        reason
+      );
+
+      removeSocket(socket);
+    }
+  );
 });
 
-server.listen(PORT, () => {
-  console.log(`AICTE SecureMeet running on port ${PORT}`);
-});
+// ----------------------------------------------------
+// HEALTH CHECK
+// ----------------------------------------------------
+
+app.get(
+  "/health",
+  (req, res) => {
+
+    res.json({
+      status: "ok",
+      service: "AICTE SecureMeet",
+      time: new Date().toISOString(),
+      meetings: meetings.size
+    });
+  }
+);
+
+// ----------------------------------------------------
+// SPA FALLBACK
+// ----------------------------------------------------
+
+app.use(
+  (req, res) => {
+
+    res.sendFile(
+      path.join(
+        __dirname,
+        "public",
+        "index.html"
+      )
+    );
+  }
+);
+
+// ----------------------------------------------------
+// START
+// ----------------------------------------------------
+
+server.listen(
+  PORT,
+  () => {
+
+    console.log(
+      `AICTE SecureMeet running on port ${PORT}`
+    );
+  }
+);
