@@ -77,36 +77,55 @@ $("createMeeting").onclick=()=>socket.emit("create-meeting",{name:user.name,titl
 $("joinMeeting").onclick=()=>{let id=$("meetingIdInput").value.trim().toUpperCase();if(id)joinRoom(id,false)};
 window.joinRoom=(id,host=false)=>socket.emit("join-meeting",{meetingId:id,name:user.name},async r=>{if(!r?.ok)return alert(r?.error||"Meeting unavailable.");meeting={id:r.meetingId,title:r.title||"AICTE Secure Meeting",hostSocket:r.hostSocket,isHost:host};(r.participants||[]).forEach(p=>names.set(p.socketId,p.name));await enterRoom()});
 
-async function enterRoom(){
-show("room");$("roomTitle").textContent=meeting.title;$("roomId").textContent="Meeting ID: "+meeting.id;$("endMeeting").classList.toggle("hidden",!meeting.isHost);
-try{localStream=await navigator.mediaDevices.getUserMedia({video:true,audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});addVideo(socket.id,localStream,user.name,true)}
-catch(e){alert("Allow camera and microphone permission, then rejoin.");return}
-for(const p of (arguments[0]||[])){}
-if(!meeting.isHost&&meeting.hostSocket)await makePeer(meeting.hostSocket,true);
-}
+window.joinRoom = (
+  id,
+  host = false
+) => {
 
-async function makePeer(id,offer){
-if(!id||peers.has(id))return peers.get(id);
-const pc=new RTCPeerConnection({iceServers:[
-{urls:"stun:stun.l.google.com:19302"},{urls:"stun:stun1.l.google.com:19302"}
-]});
-peers.set(id,pc);ice.set(id,[]);
-localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
-pc.onicecandidate=e=>{if(e.candidate)socket.emit("ice-candidate",{target:id,candidate:e.candidate})};
-pc.ontrack=e=>{if(e.streams[0])addVideo(id,e.streams[0],names.get(id)||"Participant",false)};
-pc.onconnectionstatechange=()=>{if(["failed","closed"].includes(pc.connectionState)){peers.delete(id);document.getElementById("video-"+id)?.remove()}};
-if(offer){const o=await pc.createOffer();await pc.setLocalDescription(o);socket.emit("offer",{target:id,offer:pc.localDescription})}
-return pc;
-}
-socket.on("offer",async d=>{try{const pc=await makePeer(d.sender,false);await pc.setRemoteDescription(d.offer);await flush(d.sender);const a=await pc.createAnswer();await pc.setLocalDescription(a);socket.emit("answer",{target:d.sender,answer:pc.localDescription})}catch(e){console.error(e)}});
-socket.on("answer",async d=>{try{const pc=peers.get(d.sender);if(!pc)return;await pc.setRemoteDescription(d.answer);await flush(d.sender)}catch(e){console.error(e)}});
-socket.on("ice-candidate",async d=>{const pc=peers.get(d.sender);if(!pc)return;if(pc.remoteDescription)pc.addIceCandidate(d.candidate).catch(()=>{});else ice.get(d.sender)?.push(d.candidate)});
-async function flush(id){const pc=peers.get(id);for(const c of ice.get(id)||[])try{await pc.addIceCandidate(c)}catch(e){}ice.set(id,[])}
+  socket.emit(
+    "join-meeting",
+    {
+      meetingId: id,
+      name: user.name
+    },
 
-function addVideo(id,s,n,local){let t=$("video-"+id);if(!t){t=document.createElement("div");t.className="tile";t.id="video-"+id;let v=document.createElement("video");v.autoplay=true;v.playsInline=true;v.muted=local;v.srcObject=s;let x=document.createElement("div");x.className="name";x.textContent=local?n+" (You)":n;let q=document.createElement("div");q.className="state";q.textContent=local?"● LOCAL":"● LIVE";t.append(v,x,q);$("videos").append(t)}else t.querySelector("video").srcObject=s;t.querySelector("video").play().catch(()=>{})}
+    async r => {
 
-socket.on("participant-joined",async d=>{names.set(d.socketId,d.name);if(meeting?.isHost)await makePeer(d.socketId,true)});
-socket.on("participant-left",d=>{peers.get(d.socketId)?.close();peers.delete(d.socketId);$("video-"+d.socketId)?.remove()});
+      if (!r?.ok) {
+        return alert(
+          r?.error ||
+          "Meeting unavailable."
+        );
+      }
+
+      meeting = {
+        id: r.meetingId,
+        title:
+          r.title ||
+          "AICTE Secure Meeting",
+        hostSocket:
+          r.hostSocket,
+        isHost: host,
+
+        participants:
+          r.participants || []
+      };
+
+      for (
+        const p
+        of meeting.participants
+      ) {
+
+        names.set(
+          p.socketId,
+          p.name
+        );
+      }
+
+      await enterRoom();
+    }
+  );
+};
 socket.on("meeting-ended",()=>{alert("Admin ended the meeting.");cleanup();show("dashboard");refresh()});
 
 $("mic").onclick=()=>{if(!localStream)return;let t=localStream.getAudioTracks(),on=!t[0]?.enabled;t.forEach(x=>x.enabled=on);$("mic").classList.toggle("off",!on);$("mic").textContent=on?"🎙️":"🔇"};
