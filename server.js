@@ -67,7 +67,12 @@ io.on("connection", (socket) => {
       id,
       hostSocket: socket.id,
       hostName,
-      participants: new Map()
+      participants: new Map([
+  [socket.id, {
+    name: hostName,
+    role: "Admin"
+  }]
+])
     });
 
     socket.join(id);
