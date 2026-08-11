@@ -1,0 +1,2198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>AICTE SecureMeet</title>
+<script src="/socket.io/socket.io.js"></script>
+
+<style>
+*{box-sizing:border-box}
+
+:root{
+  --bg:#020617;
+  --panel:#0f172a;
+  --panel2:#111827;
+  --border:#263449;
+  --blue:#2563eb;
+  --green:#16a34a;
+  --red:#dc2626;
+  --text:#f8fafc;
+  --muted:#94a3b8;
+}
+
+html,body{
+  margin:0;
+  min-height:100%;
+  font-family:Inter,Arial,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+}
+
+button,input{
+  font:inherit;
+}
+
+button{
+  border:0;
+  cursor:pointer;
+}
+
+.hidden{
+  display:none!important;
+}
+
+/* AUTH */
+
+.auth{
+  min-height:100vh;
+  display:grid;
+  place-items:center;
+  padding:20px;
+  background:
+    radial-gradient(circle at top,#12315f 0,#020617 45%);
+}
+
+.auth-card{
+  width:min(440px,100%);
+  background:rgba(15,23,42,.96);
+  border:1px solid var(--border);
+  border-radius:22px;
+  padding:28px;
+  box-shadow:0 25px 80px rgba(0,0,0,.45);
+}
+
+.logo{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  font-size:22px;
+  font-weight:800;
+}
+
+.subtitle{
+  color:var(--muted);
+  line-height:1.5;
+}
+
+.tabs{
+  display:flex;
+  gap:8px;
+  margin:22px 0;
+}
+
+.tabs button{
+  flex:1;
+  padding:12px;
+  border-radius:10px;
+  color:white;
+  background:#1e293b;
+}
+
+.tabs button.active{
+  background:var(--blue);
+}
+
+label{
+  display:block;
+  margin:15px 0;
+  font-weight:600;
+  font-size:14px;
+}
+
+input{
+  width:100%;
+  margin-top:7px;
+  padding:13px;
+  border:1px solid #334155;
+  border-radius:10px;
+  outline:none;
+  background:#020617;
+  color:white;
+}
+
+input:focus{
+  border-color:#3b82f6;
+}
+
+.primary{
+  background:var(--blue);
+  color:white;
+}
+
+.green{
+  background:var(--green);
+  color:white;
+}
+
+.red{
+  background:var(--red);
+  color:white;
+}
+
+.secondary{
+  background:#334155;
+  color:white;
+}
+
+.full{
+  width:100%;
+  padding:13px;
+  border-radius:10px;
+  font-weight:700;
+}
+
+/* DASHBOARD */
+
+.dashboard{
+  min-height:100vh;
+  background:#f1f5f9;
+  color:#0f172a;
+}
+
+.topbar{
+  height:66px;
+  padding:0 18px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  background:#020617;
+  color:white;
+}
+
+.topbar-right{
+  display:flex;
+  gap:10px;
+  align-items:center;
+}
+
+.user-label{
+  color:#cbd5e1;
+  font-size:13px;
+}
+
+.content{
+  max-width:1150px;
+  margin:auto;
+  padding:25px 15px;
+}
+
+.dashboard-grid{
+  display:grid;
+  grid-template-columns:2fr 1fr;
+  gap:16px;
+}
+
+.panel{
+  background:white;
+  border:1px solid #dbe3ee;
+  border-radius:16px;
+  padding:20px;
+}
+
+.create-row,
+.join-row{
+  display:flex;
+  gap:8px;
+}
+
+.create-row input,
+.join-row input{
+  flex:1;
+}
+
+.meeting-list{
+  margin-top:18px;
+}
+
+.meeting{
+  padding:14px;
+  border:1px solid #dbe3ee;
+  border-radius:12px;
+  margin-top:10px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+}
+
+.meeting small{
+  color:#64748b;
+}
+
+.live{
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  color:#15803d;
+  font-size:12px;
+  font-weight:700;
+}
+
+/* ROOM */
+
+.room{
+  height:100vh;
+  height:100dvh;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  background:#020617;
+}
+
+.room-header{
+  min-height:62px;
+  padding:8px 14px;
+  background:#0b1422;
+  border-bottom:1px solid #1e293b;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+
+.room-title{
+  font-weight:800;
+}
+
+.room-id{
+  color:#94a3b8;
+  font-size:12px;
+  margin-top:3px;
+}
+
+.room-actions{
+  display:flex;
+  gap:7px;
+}
+
+.room-actions button{
+  padding:9px 12px;
+  border-radius:8px;
+  color:white;
+}
+
+.room-main{
+  flex:1;
+  min-height:0;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 310px;
+}
+
+.videos{
+  padding:10px;
+  overflow:auto;
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+  gap:10px;
+  align-content:start;
+}
+
+.video-card{
+  position:relative;
+  min-height:190px;
+  aspect-ratio:16/10;
+  background:#111827;
+  border:1px solid #1e293b;
+  border-radius:13px;
+  overflow:hidden;
+}
+
+.video-card video{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+  background:#111827;
+}
+
+.video-name{
+  position:absolute;
+  left:8px;
+  bottom:8px;
+  padding:5px 9px;
+  border-radius:7px;
+  background:rgba(0,0,0,.7);
+  font-size:12px;
+}
+
+.video-status{
+  position:absolute;
+  right:8px;
+  top:8px;
+  padding:4px 7px;
+  border-radius:6px;
+  background:rgba(0,0,0,.7);
+  font-size:11px;
+}
+
+/* CHAT */
+
+.chat{
+  min-height:0;
+  display:flex;
+  flex-direction:column;
+  background:#0b1422;
+  border-left:1px solid #1e293b;
+}
+
+.chat-header{
+  padding:14px;
+  border-bottom:1px solid #1e293b;
+  font-weight:800;
+}
+
+.messages{
+  flex:1;
+  min-height:0;
+  overflow:auto;
+  padding:12px;
+}
+
+.message{
+  margin-bottom:12px;
+  padding:9px 10px;
+  background:#172033;
+  border-radius:10px;
+  word-break:break-word;
+}
+
+.message-name{
+  color:#60a5fa;
+  font-size:12px;
+  font-weight:700;
+  margin-bottom:3px;
+}
+
+.message-text{
+  font-size:13px;
+  color:#e2e8f0;
+}
+
+.chat-form{
+  display:flex;
+  gap:6px;
+  padding:8px;
+  border-top:1px solid #1e293b;
+}
+
+.chat-form input{
+  margin:0;
+  min-width:0;
+}
+
+/* CONTROLS */
+
+.controls{
+  min-height:76px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  padding:10px;
+  background:#0b1422;
+  border-top:1px solid #1e293b;
+}
+
+.control{
+  width:48px;
+  height:48px;
+  border-radius:50%;
+  background:#334155;
+  color:white;
+  font-size:19px;
+}
+
+.control.active{
+  background:#16a34a;
+}
+
+.control.off{
+  background:#dc2626;
+}
+
+.control-label{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:3px;
+}
+
+.control-text{
+  font-size:9px;
+  color:#94a3b8;
+}
+
+/* TOAST */
+
+.toast{
+  position:fixed;
+  left:50%;
+  bottom:95px;
+  transform:translateX(-50%);
+  background:#111827;
+  color:white;
+  border:1px solid #334155;
+  padding:11px 15px;
+  border-radius:10px;
+  z-index:100;
+  box-shadow:0 10px 30px rgba(0,0,0,.35);
+}
+
+/* MOBILE */
+
+@media(max-width:800px){
+
+  .dashboard-grid{
+    grid-template-columns:1fr;
+  }
+
+  .room-main{
+    grid-template-columns:1fr;
+  }
+
+  .chat{
+    display:none;
+  }
+
+  .videos{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:7px;
+    padding:7px;
+  }
+
+  .video-card{
+    min-height:130px;
+    aspect-ratio:4/3;
+  }
+
+  .room-header{
+    min-height:58px;
+  }
+
+  .room-title{
+    font-size:14px;
+  }
+
+  .room-actions button{
+    padding:8px;
+    font-size:12px;
+  }
+
+  .control{
+    width:45px;
+    height:45px;
+  }
+
+}
+
+@media(max-width:480px){
+
+  .auth-card{
+    padding:21px;
+  }
+
+  .topbar{
+    padding:0 10px;
+  }
+
+  .user-label{
+    display:none;
+  }
+
+  .content{
+    padding:15px 10px;
+  }
+
+  .create-row,
+  .join-row{
+    flex-direction:column;
+  }
+
+  .videos{
+    grid-template-columns:1fr 1fr;
+  }
+
+  .video-card{
+    min-height:120px;
+  }
+
+  .controls{
+    gap:6px;
+  }
+
+  .control{
+    width:43px;
+    height:43px;
+  }
+
+}
+</style>
+</head>
+
+<body>
+
+<!-- AUTH -->
+
+<section id="auth" class="auth">
+
+  <div class="auth-card">
+
+    <div class="logo">
+      🛡️ AICTE SecureMeet
+    </div>
+
+    <p class="subtitle">
+      Secure real-time online meeting platform
+      for authorized users.
+    </p>
+
+    <div class="tabs">
+
+      <button id="adminTab" class="active">
+        👑 Admin
+      </button>
+
+      <button id="participantTab">
+        👥 Participant
+      </button>
+
+    </div>
+
+    <!-- ADMIN -->
+
+    <div id="adminForm">
+
+      <label>
+        Admin name
+        <input
+          id="adminName"
+          value="AICTE Administrator">
+      </label>
+
+      <label>
+        Admin email
+        <input
+          id="adminEmail"
+          type="email"
+          value="admin@aicte-securemeet.demo">
+      </label>
+
+      <label>
+        Password
+        <input
+          id="adminPassword"
+          type="password"
+          value="DemoPass123!">
+      </label>
+
+      <button
+        id="adminLogin"
+        class="primary full">
+        Login as Admin
+      </button>
+
+    </div>
+
+    <!-- PARTICIPANT -->
+
+    <div id="participantForm" class="hidden">
+
+      <label>
+        Your name
+        <input
+          id="participantName"
+          placeholder="Enter your name">
+      </label>
+
+      <label>
+        Email
+        <input
+          id="participantEmail"
+          type="email"
+          placeholder="friend@example.com">
+      </label>
+
+      <button
+        id="participantLogin"
+        class="primary full">
+        Continue as Participant
+      </button>
+
+    </div>
+
+  </div>
+
+</section>
+
+
+<!-- DASHBOARD -->
+
+<section id="dashboard" class="dashboard hidden">
+
+  <header class="topbar">
+
+    <b>🛡️ AICTE SecureMeet</b>
+
+    <div class="topbar-right">
+
+      <span
+        id="userLabel"
+        class="user-label">
+      </span>
+
+      <button
+        id="logout"
+        class="secondary">
+        Logout
+      </button>
+
+    </div>
+
+  </header>
+
+  <main class="content">
+
+    <h1 id="welcome">
+      Welcome
+    </h1>
+
+    <div class="dashboard-grid">
+
+      <div class="panel">
+
+        <h2>🎥 Meetings</h2>
+
+        <!-- ADMIN -->
+
+        <div id="adminCreate">
+
+          <p>
+            Start a live meeting and share
+            the Meeting ID with participants.
+          </p>
+
+          <div class="create-row">
+
+            <input
+              id="meetingTitle"
+              value="AICTE Secure Meeting"
+              placeholder="Meeting title">
+
+            <button
+              id="createMeeting"
+              class="primary">
+              Start Meeting
+            </button>
+
+          </div>
+
+        </div>
+
+        <!-- PARTICIPANT JOIN -->
+
+        <div style="margin-top:20px">
+
+          <h3>
+            Join with Meeting ID
+          </h3>
+
+          <div class="join-row">
+
+            <input
+              id="meetingId"
+              placeholder="Example: A1B2C3D4">
+
+            <button
+              id="joinMeeting"
+              class="green">
+              Join
+            </button>
+
+          </div>
+
+        </div>
+
+        <div
+          id="meetingList"
+          class="meeting-list">
+        </div>
+
+      </div>
+
+
+      <div class="panel">
+
+        <h2>🔐 Security</h2>
+
+        <p>
+          Your camera and microphone are
+          controlled by your browser.
+        </p>
+
+        <p>
+          WebRTC is used for real-time
+          audio/video communication.
+        </p>
+
+        <span class="live">
+          ● SERVICE ONLINE
+        </span>
+
+      </div>
+
+    </div>
+
+  </main>
+
+</section>
+
+
+<!-- MEETING ROOM -->
+
+<section id="room" class="room hidden">
+
+  <header class="room-header">
+
+    <div>
+
+      <div
+        id="roomTitle"
+        class="room-title">
+        AICTE Secure Meeting
+      </div>
+
+      <div
+        id="roomId"
+        class="room-id">
+      </div>
+
+    </div>
+
+    <div class="room-actions">
+
+      <button
+        id="copyLink"
+        class="secondary">
+        🔗 Copy
+      </button>
+
+      <button
+        id="endMeeting"
+        class="red hidden">
+        End
+      </button>
+
+      <button
+        id="leave"
+        class="red">
+        Leave
+      </button>
+
+    </div>
+
+  </header>
+
+
+  <div class="room-main">
+
+    <div
+      id="videos"
+      class="videos">
+    </div>
+
+
+    <aside class="chat">
+
+      <div class="chat-header">
+        💬 Meeting Chat
+      </div>
+
+      <div
+        id="messages"
+        class="messages">
+      </div>
+
+      <form
+        id="chatForm"
+        class="chat-form">
+
+        <input
+          id="chatInput"
+          placeholder="Type a message...">
+
+        <button
+          class="primary"
+          type="submit">
+          Send
+        </button>
+
+      </form>
+
+    </aside>
+
+  </div>
+
+
+  <footer class="controls">
+
+    <div class="control-label">
+
+      <button
+        id="mic"
+        class="control active">
+        🎙️
+      </button>
+
+      <span
+        id="micText"
+        class="control-text">
+        Mic ON
+      </span>
+
+    </div>
+
+
+    <div class="control-label">
+
+      <button
+        id="camera"
+        class="control active">
+        📷
+      </button>
+
+      <span
+        id="cameraText"
+        class="control-text">
+        Camera ON
+      </span>
+
+    </div>
+
+
+    <div class="control-label">
+
+      <button
+        id="screen"
+        class="control">
+        🖥️
+      </button>
+
+      <span class="control-text">
+        Share
+      </span>
+
+    </div>
+
+  </footer>
+
+</section>
+
+
+<div
+  id="toast"
+  class="toast hidden">
+</div>
+
+
+<script>
+
+const socket = io();
+
+let user = null;
+let meeting = null;
+let localStream = null;
+
+const peers = new Map();
+const peerNames = new Map();
+
+
+const $ = id =>
+  document.getElementById(id);
+
+
+function show(id){
+
+  ["auth","dashboard","room"].forEach(
+    section => $(section).classList.add("hidden")
+  );
+
+  $(id).classList.remove("hidden");
+}
+
+
+function toast(message){
+
+  const box = $("toast");
+
+  box.textContent = message;
+  box.classList.remove("hidden");
+
+  setTimeout(
+    () => box.classList.add("hidden"),
+    2500
+  );
+}
+
+
+function escapeHtml(value){
+
+  return String(value)
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#039;");
+}
+
+
+/* AUTH TABS */
+
+$("adminTab").onclick = () => {
+
+  $("adminTab").classList.add("active");
+  $("participantTab").classList.remove("active");
+
+  $("adminForm").classList.remove("hidden");
+  $("participantForm").classList.add("hidden");
+
+};
+
+
+$("participantTab").onclick = () => {
+
+  $("participantTab").classList.add("active");
+  $("adminTab").classList.remove("active");
+
+  $("participantForm").classList.remove("hidden");
+  $("adminForm").classList.add("hidden");
+
+};
+
+
+/* LOGIN */
+
+$("adminLogin").onclick = () => {
+
+  user = {
+    name:
+      $("adminName").value.trim()
+      || "AICTE Administrator",
+
+    email:
+      $("adminEmail").value.trim(),
+
+    role:"Admin"
+  };
+
+  openDashboard();
+
+};
+
+
+$("participantLogin").onclick = () => {
+
+  const name =
+    $("participantName").value.trim();
+
+  const email =
+    $("participantEmail").value.trim();
+
+  if(!name || !email){
+
+    alert("Please enter your name and email.");
+
+    return;
+  }
+
+  user = {
+    name,
+    email,
+    role:"Participant"
+  };
+
+  openDashboard();
+
+};
+
+
+/* DASHBOARD */
+
+function openDashboard(){
+
+  show("dashboard");
+
+  $("welcome").textContent =
+    "Welcome, " + user.name;
+
+  $("userLabel").textContent =
+    user.role + " · " + user.email;
+
+
+  if(user.role === "Admin"){
+
+    $("adminCreate").classList.remove("hidden");
+    $("endMeeting").classList.remove("hidden");
+
+  }else{
+
+    $("adminCreate").classList.add("hidden");
+
+  }
+
+
+  refreshMeetings();
+
+}
+
+
+function refreshMeetings(){
+
+  socket.emit(
+    "list-meetings",
+    list => {
+
+      const box =
+        $("meetingList");
+
+      if(!list.length){
+
+        box.innerHTML =
+          "<p>No live meetings available.</p>";
+
+        return;
+      }
+
+
+      box.innerHTML =
+        list.map(meeting => `
+
+          <div class="meeting">
+
+            <div>
+
+              <span class="live">
+                ● LIVE
+              </span>
+
+              <br>
+
+              <b>${escapeHtml(meeting.id)}</b>
+
+              <div>
+                Host:
+                ${escapeHtml(meeting.hostName)}
+              </div>
+
+              <small>
+                ${meeting.participantCount}
+                participant(s)
+              </small>
+
+            </div>
+
+            <button
+              class="green"
+              onclick="joinMeetingById('${meeting.id}')">
+              Join
+            </button>
+
+          </div>
+
+        `).join("");
+
+    }
+  );
+
+}
+
+
+/* CREATE */
+
+$("createMeeting").onclick = () => {
+
+  socket.emit(
+    "create-meeting",
+    {
+      name:user.name
+    },
+
+    result => {
+
+      if(!result.ok){
+
+        alert("Unable to create meeting.");
+
+        return;
+      }
+
+      joinMeetingById(
+        result.meetingId,
+        true
+      );
+
+    }
+  );
+
+};
+
+
+/* JOIN */
+
+window.joinMeetingById =
+function(id,isHost=false){
+
+  socket.emit(
+    "join-meeting",
+    {
+      meetingId:id,
+      name:user.name
+    },
+
+    async result => {
+
+      if(!result.ok){
+
+        alert(result.error);
+
+        return;
+      }
+
+
+      meeting = {
+
+        id:result.meetingId,
+
+        hostSocket:
+          result.hostSocket,
+
+        isHost,
+
+        participants:
+          result.participants || []
+
+      };
+
+
+      for(
+        const participant
+        of meeting.participants
+      ){
+
+        peerNames.set(
+          participant.socketId,
+          participant.name
+        );
+
+      }
+
+
+      await startRoom();
+
+    }
+  );
+
+};
+
+
+$("joinMeeting").onclick = () => {
+
+  const id =
+    $("meetingId")
+      .value
+      .trim()
+      .toUpperCase();
+
+  if(!id){
+
+    alert("Enter a Meeting ID.");
+
+    return;
+  }
+
+  joinMeetingById(id,false);
+
+};
+
+
+/* ROOM */
+
+async function startRoom(){
+
+  show("room");
+
+  $("roomId").textContent =
+    "Meeting ID: " + meeting.id;
+
+  $("endMeeting").classList.toggle(
+    "hidden",
+    !meeting.isHost
+  );
+
+
+  try{
+
+    localStream =
+      await navigator.mediaDevices.getUserMedia({
+        video:{
+          facingMode:"user"
+        },
+        audio:{
+          echoCancellation:true,
+          noiseSuppression:true,
+          autoGainControl:true
+        }
+      });
+
+
+    addVideo(
+      socket.id,
+      localStream,
+      user.name
+    );
+
+
+  }catch(error){
+
+    console.error(error);
+
+    alert(
+      "Camera/microphone permission was not granted. Please allow Camera and Microphone for this site and rejoin."
+    );
+
+  }
+
+
+  /*
+   * Participant connects to Admin.
+   */
+
+  if(!meeting.isHost){
+
+    createPeer(
+      meeting.hostSocket,
+      true
+    );
+
+  }
+
+}
+
+
+/* NEW PARTICIPANT */
+
+socket.on(
+  "participant-joined",
+  data => {
+
+    if(!meeting) return;
+
+    peerNames.set(
+      data.socketId,
+      data.name
+    );
+
+
+    if(meeting.isHost){
+
+      createPeer(
+        data.socketId,
+        false
+      );
+
+    }
+
+    toast(
+      data.name + " joined the meeting"
+    );
+
+  }
+);
+
+
+/* PEER */
+
+function createPeer(
+  target,
+  initiator
+){
+
+  if(peers.has(target)){
+
+    return peers.get(target);
+
+  }
+
+
+  const pc =
+    new RTCPeerConnection({
+
+      iceServers:[
+
+        {
+          urls:
+            "stun:stun.l.google.com:19302"
+        },
+
+        {
+          urls:
+            "stun:stun1.l.google.com:19302"
+        }
+
+      ]
+
+    });
+
+
+  peers.set(
+    target,
+    pc
+  );
+
+
+  if(localStream){
+
+    localStream
+      .getTracks()
+      .forEach(track => {
+
+        pc.addTrack(
+          track,
+          localStream
+        );
+
+      });
+
+  }
+
+
+  pc.onicecandidate =
+    event => {
+
+      if(event.candidate){
+
+        socket.emit(
+          "ice-candidate",
+          {
+            target,
+            candidate:event.candidate
+          }
+        );
+
+      }
+
+    };
+
+
+  pc.ontrack =
+    event => {
+
+      const stream =
+        event.streams[0];
+
+      addVideo(
+        target,
+        stream,
+        peerNames.get(target)
+        || "Participant"
+      );
+
+    };
+
+
+  pc.onconnectionstatechange =
+    () => {
+
+      if(
+        pc.connectionState ===
+        "failed"
+      ){
+
+        toast(
+          "Connection failed. Please rejoin."
+        );
+
+      }
+
+    };
+
+
+  if(initiator){
+
+    pc.createOffer()
+      .then(
+        offer =>
+          pc.setLocalDescription(offer)
+      )
+      .then(
+        () => {
+
+          socket.emit(
+            "offer",
+            {
+              target,
+              offer:
+                pc.localDescription
+            }
+          );
+
+        }
+      )
+      .catch(console.error);
+
+  }
+
+
+  return pc;
+
+}
+
+
+/* OFFER */
+
+socket.on(
+  "offer",
+  async data => {
+
+    const pc =
+      createPeer(
+        data.sender,
+        false
+      );
+
+
+    await pc.setRemoteDescription(
+      data.offer
+    );
+
+
+    const answer =
+      await pc.createAnswer();
+
+
+    await pc.setLocalDescription(
+      answer
+    );
+
+
+    socket.emit(
+      "answer",
+      {
+        target:data.sender,
+        answer
+      }
+    );
+
+  }
+);
+
+
+/* ANSWER */
+
+socket.on(
+  "answer",
+  async data => {
+
+    const pc =
+      peers.get(data.sender);
+
+    if(!pc) return;
+
+    await pc.setRemoteDescription(
+      data.answer
+    );
+
+  }
+);
+
+
+/* ICE */
+
+socket.on(
+  "ice-candidate",
+  async data => {
+
+    const pc =
+      peers.get(data.sender);
+
+    if(!pc) return;
+
+    try{
+
+      await pc.addIceCandidate(
+        data.candidate
+      );
+
+    }catch(error){
+
+      console.error(
+        "ICE error:",
+        error
+      );
+
+    }
+
+  }
+);
+
+
+/* VIDEO */
+
+function addVideo(
+  id,
+  stream,
+  name
+){
+
+  let card =
+    document.getElementById(
+      "video-" + id
+    );
+
+
+  if(!card){
+
+    card =
+      document.createElement("div");
+
+    card.className =
+      "video-card";
+
+    card.id =
+      "video-" + id;
+
+
+    const video =
+      document.createElement("video");
+
+    video.autoplay = true;
+    video.playsInline = true;
+
+
+    if(id === socket.id){
+
+      video.muted = true;
+
+    }
+
+
+    video.srcObject =
+      stream;
+
+
+    const nameBox =
+      document.createElement("div");
+
+    nameBox.className =
+      "video-name";
+
+    nameBox.textContent =
+      id === socket.id
+      ? name + " (You)"
+      : name;
+
+
+    const status =
+      document.createElement("div");
+
+    status.className =
+      "video-status";
+
+    status.textContent =
+      "● LIVE";
+
+
+    card.appendChild(video);
+    card.appendChild(nameBox);
+    card.appendChild(status);
+
+
+    $("videos")
+      .appendChild(card);
+
+  }else{
+
+    const video =
+      card.querySelector("video");
+
+    video.srcObject =
+      stream;
+
+  }
+
+}
+
+
+/* MICROPHONE */
+
+$("mic").onclick = () => {
+
+  if(!localStream){
+
+    toast(
+      "Microphone is not available."
+    );
+
+    return;
+  }
+
+
+  const tracks =
+    localStream.getAudioTracks();
+
+
+  if(!tracks.length){
+
+    toast(
+      "No microphone track found."
+    );
+
+    return;
+  }
+
+
+  const enabled =
+    tracks[0].enabled;
+
+
+  tracks.forEach(
+    track =>
+      track.enabled = !enabled
+  );
+
+
+  const nowOn =
+    !enabled;
+
+
+  $("mic")
+    .classList.toggle(
+      "active",
+      nowOn
+    );
+
+  $("mic")
+    .classList.toggle(
+      "off",
+      !nowOn
+    );
+
+
+  $("micText").textContent =
+    nowOn
+    ? "Mic ON"
+    : "Mic OFF";
+
+
+  $("mic").textContent =
+    nowOn
+    ? "🎙️"
+    : "🔇";
+
+};
+
+
+/* CAMERA */
+
+$("camera").onclick = () => {
+
+  if(!localStream){
+
+    toast(
+      "Camera is not available."
+    );
+
+    return;
+  }
+
+
+  const tracks =
+    localStream.getVideoTracks();
+
+
+  if(!tracks.length){
+
+    toast(
+      "No camera track found."
+    );
+
+    return;
+  }
+
+
+  const enabled =
+    tracks[0].enabled;
+
+
+  tracks.forEach(
+    track =>
+      track.enabled = !enabled
+  );
+
+
+  const nowOn =
+    !enabled;
+
+
+  $("camera")
+    .classList.toggle(
+      "active",
+      nowOn
+    );
+
+  $("camera")
+    .classList.toggle(
+      "off",
+      !nowOn
+    );
+
+
+  $("cameraText").textContent =
+    nowOn
+    ? "Camera ON"
+    : "Camera OFF";
+
+
+  $("camera").textContent =
+    nowOn
+    ? "📷"
+    : "🚫";
+
+};
+
+
+/* SCREEN SHARE */
+
+$("screen").onclick =
+async () => {
+
+  if(!localStream){
+
+    toast(
+      "Join the meeting first."
+    );
+
+    return;
+  }
+
+
+  if(!navigator.mediaDevices.getDisplayMedia){
+
+    toast(
+      "Screen sharing is not supported by this browser."
+    );
+
+    return;
+  }
+
+
+  try{
+
+    const screenStream =
+      await navigator.mediaDevices
+        .getDisplayMedia({
+          video:true
+        });
+
+
+    const screenTrack =
+      screenStream.getVideoTracks()[0];
+
+
+    peers.forEach(
+      pc => {
+
+        const sender =
+          pc.getSenders()
+            .find(
+              s =>
+                s.track &&
+                s.track.kind === "video"
+            );
+
+
+        if(sender){
+
+          sender.replaceTrack(
+            screenTrack
+          );
+
+        }
+
+      }
+    );
+
+
+    const localVideo =
+      document
+        .getElementById(
+          "video-" + socket.id
+        )
+        ?.querySelector("video");
+
+
+    if(localVideo){
+
+      localVideo.srcObject =
+        screenStream;
+
+    }
+
+
+    screenTrack.onended =
+      () => {
+
+        const cameraTrack =
+          localStream
+            .getVideoTracks()[0];
+
+
+        peers.forEach(
+          pc => {
+
+            const sender =
+              pc.getSenders()
+                .find(
+                  s =>
+                    s.track &&
+                    s.track.kind === "video"
+                );
+
+
+            if(sender && cameraTrack){
+
+              sender.replaceTrack(
+                cameraTrack
+              );
+
+            }
+
+          }
+        );
+
+
+        if(localVideo){
+
+          localVideo.srcObject =
+            localStream;
+
+        }
+
+      };
+
+
+  }catch(error){
+
+    console.log(
+      "Screen share cancelled",
+      error
+    );
+
+  }
+
+};
+
+
+/* CHAT */
+
+$("chatForm").onsubmit =
+event => {
+
+  event.preventDefault();
+
+
+  const input =
+    $("chatInput");
+
+
+  const message =
+    input.value.trim();
+
+
+  if(!message) return;
+
+
+  socket.emit(
+    "chat-message",
+    {
+      message
+    }
+  );
+
+
+  input.value = "";
+
+};
+
+
+socket.on(
+  "chat-message",
+  data => {
+
+    const item =
+      document.createElement("div");
+
+    item.className =
+      "message";
+
+
+    item.innerHTML = `
+
+      <div class="message-name">
+        ${escapeHtml(data.sender)}
+      </div>
+
+      <div class="message-text">
+        ${escapeHtml(data.message)}
+      </div>
+
+    `;
+
+
+    $("messages")
+      .appendChild(item);
+
+
+    $("messages").scrollTop =
+      $("messages").scrollHeight;
+
+  }
+);
+
+
+/* COPY MEETING LINK */
+
+$("copyLink").onclick =
+async () => {
+
+  if(!meeting) return;
+
+
+  const link =
+    window.location.origin
+    + "?meeting="
+    + encodeURIComponent(
+      meeting.id
+    );
+
+
+  try{
+
+    await navigator.clipboard.writeText(
+      link
+    );
+
+    toast(
+      "Meeting link copied."
+    );
+
+  }catch{
+
+    prompt(
+      "Copy this meeting link:",
+      link
+    );
+
+  }
+
+};
+
+
+/* END MEETING */
+
+$("endMeeting").onclick =
+() => {
+
+  if(!meeting || !meeting.isHost){
+
+    return;
+  }
+
+
+  if(
+    !confirm(
+      "End this meeting for everyone?"
+    )
+  ){
+
+    return;
+  }
+
+
+  socket.emit(
+    "end-meeting"
+  );
+
+};
+
+
+/* LEAVE */
+
+$("leave").onclick =
+() => {
+
+  socket.emit(
+    "leave-meeting"
+  );
+
+  cleanup();
+
+  show("dashboard");
+
+  refreshMeetings();
+
+};
+
+
+/* PARTICIPANT LEFT */
+
+socket.on(
+  "participant-left",
+  data => {
+
+    const pc =
+      peers.get(
+        data.socketId
+      );
+
+
+    if(pc){
+
+      pc.close();
+
+      peers.delete(
+        data.socketId
+      );
+
+    }
+
+
+    const card =
+      document.getElementById(
+        "video-" + data.socketId
+      );
+
+
+    if(card){
+
+      card.remove();
+
+    }
+
+
+    toast(
+      "A participant left the meeting."
+    );
+
+  }
+);
+
+
+/* MEETING ENDED */
+
+socket.on(
+  "meeting-ended",
+  () => {
+
+    alert(
+      "The Admin ended the meeting."
+    );
+
+
+    cleanup();
+
+    show("dashboard");
+
+    refreshMeetings();
+
+  }
+);
+
+
+/* LOGOUT */
+
+$("logout").onclick =
+() => {
+
+  cleanup();
+
+  user = null;
+
+  show("auth");
+
+};
+
+
+/* CLEANUP */
+
+function cleanup(){
+
+  if(localStream){
+
+    localStream
+      .getTracks()
+      .forEach(
+        track =>
+          track.stop()
+      );
+
+    localStream = null;
+
+  }
+
+
+  peers.forEach(
+    pc =>
+      pc.close()
+  );
+
+
+  peers.clear();
+
+  peerNames.clear();
+
+
+  $("videos").innerHTML = "";
+
+  $("messages").innerHTML = "";
+
+
+  meeting = null;
+
+
+  $("mic").textContent = "🎙️";
+  $("mic").classList.add("active");
+  $("mic").classList.remove("off");
+  $("micText").textContent = "Mic ON";
+
+
+  $("camera").textContent = "📷";
+  $("camera").classList.add("active");
+  $("camera").classList.remove("off");
+  $("cameraText").textContent = "Camera ON";
+
+}
+
+
+/* AUTOMATIC MEETING LINK */
+
+const params =
+  new URLSearchParams(
+    window.location.search
+  );
+
+const meetingFromLink =
+  params.get("meeting");
+
+
+if(meetingFromLink){
+
+  $("meetingId").value =
+    meetingFromLink.toUpperCase();
+
+}
+
+</script>
+
+</body>
+</html>
