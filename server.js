@@ -558,20 +558,18 @@ app.get("/health", (req, res) => {
 // SPA FALLBACK
 // ----------------------------------------------------
 
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+app.use((req, res) => {
+  res.sendFile(
+    path.join(__dirname, "public", "index.html")
+  );
 });
 
 // ----------------------------------------------------
 // START
 // ----------------------------------------------------
 
-server.listen(
-  PORT,
-  () => {
-
-    console.log(
-      `AICTE SecureMeet running on port ${PORT}`
-    );
-  }
-);
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(
+    `AICTE SecureMeet running on port ${PORT}`
+  );
+});
