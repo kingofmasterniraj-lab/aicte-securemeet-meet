@@ -16,7 +16,11 @@ const PORT = process.env.PORT || 3000;
 const meetings = new Map();
 
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
+app.use((req, res) => {
+  res.sendFile(
+    path.join(__dirname, "public", "index.html")
+  );
+});
 
 function makeMeetingId() {
   return crypto.randomBytes(4).toString("hex").toUpperCase();
