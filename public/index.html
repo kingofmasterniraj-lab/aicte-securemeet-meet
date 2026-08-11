@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AICTE SecureMeet</title>
+<script src="/socket.io/socket.io.js"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#07111f;color:#fff}
+button,input{font:inherit}button{cursor:pointer;border:0;border-radius:9px;padding:11px 15px;font-weight:700}
+input{width:100%;padding:12px;border:1px solid #334155;border-radius:9px;background:#0b1728;color:#fff}
+.hidden{display:none!important}.auth{min-height:100vh;display:grid;place-items:center;padding:20px;background:linear-gradient(145deg,#0b2a55,#020617)}
+.card{width:min(440px,100%);background:#0d1929;border:1px solid #26384f;border-radius:18px;padding:26px;box-shadow:0 20px 60px #0008}
+.tabs{display:flex;gap:8px;margin:18px 0}.tabs button{flex:1;background:#1e293b;color:#fff}.tabs .on{background:#2563eb}
+label{display:block;margin:14px 0;font-size:14px}label input{margin-top:6px}
+.primary{background:#2563eb;color:#fff}.green{background:#16a34a;color:#fff}.red{background:#dc2626;color:#fff}.gray{background:#334155;color:#fff}.full{width:100%}
+.top{height:62px;background:#020617;border-bottom:1px solid #243247;display:flex;align-items:center;justify-content:space-between;padding:0 16px}
+.main{max-width:1150px;margin:auto;padding:20px}.grid{display:grid;grid-template-columns:2fr 1fr;gap:15px}.panel{background:#fff;color:#0f172a;border-radius:15px;padding:18px}
+.row{display:flex;gap:8px}.row input{flex:1}.meeting{margin-top:10px;padding:12px;border:1px solid #d5deea;border-radius:10px;display:flex;justify-content:space-between;align-items:center;gap:8px}.live{color:#15803d;font-weight:bold;font-size:12px}
+.room{height:100vh;height:100dvh;display:flex;flex-direction:column;background:#020617}.roomtop{padding:9px 13px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #243247;gap:8px}
+.roommain{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 320px}.videos{overflow:auto;padding:9px;display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:9px;align-content:start}
+.tile{position:relative;min-height:180px;background:#111827;border:1px solid #263449;border-radius:12px;overflow:hidden;aspect-ratio:16/10}.tile video{width:100%;height:100%;object-fit:cover;background:#111827}
+.name{position:absolute;left:8px;bottom:8px;background:#000b;padding:5px 8px;border-radius:6px;font-size:12px}.state{position:absolute;right:8px;top:8px;background:#000b;padding:5px 7px;border-radius:6px;font-size:11px}
+.chat{display:flex;flex-direction:column;min-height:0;background:#0b1422;border-left:1px solid #243247}.chat h3{padding:12px;margin:0;border-bottom:1px solid #243247}.msgs{flex:1;overflow:auto;padding:10px}.msg{background:#172235;padding:8px;border-radius:8px;margin-bottom:7px}.msg b{font-size:12px;color:#60a5fa}.msg div{font-size:13px;margin-top:3px;word-break:break-word}
+.chatform{display:flex;gap:6px;padding:8px}.chatform input{min-width:0}.controls{height:76px;display:flex;justify-content:center;align-items:center;gap:9px;border-top:1px solid #243247}.ctrl{width:48px;height:48px;border-radius:50%;padding:0;background:#334155;color:#fff;font-size:18px}.ctrl.off{background:#dc2626}.mobilechat{display:none}
+@media(max-width:760px){.grid{grid-template-columns:1fr}.roommain{grid-template-columns:1fr}.chat{display:none}.chat.open{display:flex;position:fixed;z-index:10;top:62px;right:0;bottom:76px;width:min(350px,92vw);box-shadow:-20px 0 40px #0008}.mobilechat{display:inline-block}.videos{grid-template-columns:repeat(2,minmax(0,1fr));padding:6px;gap:6px}.tile{min-height:125px}.row{flex-direction:column}}
+@media(max-width:430px){.videos{grid-template-columns:1fr}.tile{min-height:190px}}
+</style>
+</head>
+<body>
+<section id="auth" class="auth"><div class="card">
+<h1>🛡️ AICTE SecureMeet</h1><p style="color:#9fb0c5">Secure real-time meeting demo</p>
+<div class="tabs"><button id="adminTab" class="on">Admin</button><button id="participantTab">Participant</button></div>
+<div id="adminForm">
+<label>Name<input id="adminName" value="AICTE Administrator"></label>
+<label>Email<input id="adminEmail" type="email" value="admin@aicte-securemeet.demo"></label>
+<label>Password<input id="adminPassword" type="password" value="DemoPass123!"></label>
+<button id="adminLogin" class="primary full">Login as Admin</button>
+</div>
+<div id="participantForm" class="hidden">
+<label>Name<input id="participantName" placeholder="Your name"></label>
+<label>Email<input id="participantEmail" type="email" placeholder="your@email.com"></label>
+<button id="participantLogin" class="primary full">Continue as Participant</button>
+</div>
+</div></section>
+
+<section id="dashboard" class="hidden">
+<header class="top"><b>🛡️ AICTE SecureMeet</b><span><span id="who"></span> <button id="logout" class="gray">Logout</button></span></header>
+<main class="main"><h2 id="welcome"></h2><div class="grid"><section class="panel">
+<h3>🎥 Meetings</h3><div id="createBox"><div class="row"><input id="meetingTitle" value="AICTE Secure Meeting"><button id="createMeeting" class="primary">Start Meeting</button></div></div>
+<h4>Join by Meeting ID</h4><div class="row"><input id="meetingIdInput" placeholder="Meeting ID"><button id="joinMeeting" class="green">Join</button></div><div id="meetingList"></div>
+</section><section class="panel"><h3>🔐 Security</h3><p>WebRTC camera/microphone.</p><p>Live Socket.IO signaling and chat.</p><p>Demo application — do not use real confidential data.</p></section></div></main>
+</section>
+
+<section id="room" class="room hidden"><header class="roomtop">
+<div><b id="roomTitle">AICTE SecureMeet</b><small id="roomId" style="display:block;color:#94a3b8"></small></div>
+<div><button id="copyLink" class="gray">🔗 Copy</button><button id="mobileChat" class="gray mobilechat">💬</button><button id="endMeeting" class="red hidden">End</button><button id="leaveMeeting" class="red">Leave</button></div>
+</header><div class="roommain"><div id="videos" class="videos"></div>
+<aside id="chat" class="chat"><h3>💬 Chat</h3><div id="messages" class="msgs"></div><form id="chatForm" class="chatform"><input id="chatInput" maxlength="1000" placeholder="Message..."><button class="primary">Send</button></form></aside></div>
+<footer class="controls"><button id="mic" class="ctrl">🎙️</button><button id="camera" class="ctrl">📷</button><button id="share" class="ctrl">🖥️</button></footer></section>
+
+<script>
+const socket=io({transports:["websocket","polling"],reconnection:true});
+let user=null,meeting=null,localStream=null;
+const peers=new Map(),names=new Map(),ice=new Map();
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+function show(id){["auth","dashboard","room"].forEach(x=>$(x).classList.add("hidden"));$(id).classList.remove("hidden")}
+
+$("adminTab").onclick=()=>{$("adminTab").classList.add("on");$("participantTab").classList.remove("on");$("adminForm").classList.remove("hidden");$("participantForm").classList.add("hidden")};
+$("participantTab").onclick=()=>{$("participantTab").classList.add("on");$("adminTab").classList.remove("on");$("participantForm").classList.remove("hidden");$("adminForm").classList.add("hidden")};
+$("adminLogin").onclick=()=>{let n=$("adminName").value.trim(),e=$("adminEmail").value.trim(),p=$("adminPassword").value;if(!n||!e||!p)return alert("Fill all fields.");user={name:n,email:e,role:"Admin"};dashboard()};
+$("participantLogin").onclick=()=>{let n=$("participantName").value.trim(),e=$("participantEmail").value.trim();if(!n||!e)return alert("Enter name and email.");user={name:n,email:e,role:"Participant"};dashboard()};
+function dashboard(){show("dashboard");$("welcome").textContent="Welcome, "+user.name;$("who").textContent=user.role+" · "+user.email;$("createBox").classList.toggle("hidden",user.role!=="Admin");refresh()}
+function refresh(){socket.emit("list-meetings",list=>{$("meetingList").innerHTML=list?.length?list.map(m=>`<div class="meeting"><div><span class="live">● LIVE</span><br><b>${esc(m.id)}</b><br><small>${esc(m.title||"Meeting")} · Host: ${esc(m.hostName)} · ${m.participantCount} connected</small></div><button class="green" onclick="joinRoom('${m.id}')">Join</button></div>`).join(""):"<p>No live meetings.</p>"})}
+$("createMeeting").onclick=()=>socket.emit("create-meeting",{name:user.name,title:$("meetingTitle").value.trim()},r=>{if(!r?.ok)return alert(r?.error||"Create failed");joinRoom(r.meetingId,true)});
+$("joinMeeting").onclick=()=>{let id=$("meetingIdInput").value.trim().toUpperCase();if(id)joinRoom(id,false)};
+window.joinRoom=(id,host=false)=>socket.emit("join-meeting",{meetingId:id,name:user.name},async r=>{if(!r?.ok)return alert(r?.error||"Meeting unavailable.");meeting={id:r.meetingId,title:r.title||"AICTE Secure Meeting",hostSocket:r.hostSocket,isHost:host};(r.participants||[]).forEach(p=>names.set(p.socketId,p.name));await enterRoom()});
+
+async function enterRoom(){
+show("room");$("roomTitle").textContent=meeting.title;$("roomId").textContent="Meeting ID: "+meeting.id;$("endMeeting").classList.toggle("hidden",!meeting.isHost);
+try{localStream=await navigator.mediaDevices.getUserMedia({video:true,audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});addVideo(socket.id,localStream,user.name,true)}
+catch(e){alert("Allow camera and microphone permission, then rejoin.");return}
+for(const p of (arguments[0]||[])){}
+if(!meeting.isHost&&meeting.hostSocket)await makePeer(meeting.hostSocket,true);
+}
+
+async function makePeer(id,offer){
+if(!id||peers.has(id))return peers.get(id);
+const pc=new RTCPeerConnection({iceServers:[
+{urls:"stun:stun.l.google.com:19302"},{urls:"stun:stun1.l.google.com:19302"}
+]});
+peers.set(id,pc);ice.set(id,[]);
+localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
+pc.onicecandidate=e=>{if(e.candidate)socket.emit("ice-candidate",{target:id,candidate:e.candidate})};
+pc.ontrack=e=>{if(e.streams[0])addVideo(id,e.streams[0],names.get(id)||"Participant",false)};
+pc.onconnectionstatechange=()=>{if(["failed","closed"].includes(pc.connectionState)){peers.delete(id);document.getElementById("video-"+id)?.remove()}};
+if(offer){const o=await pc.createOffer();await pc.setLocalDescription(o);socket.emit("offer",{target:id,offer:pc.localDescription})}
+return pc;
+}
+socket.on("offer",async d=>{try{const pc=await makePeer(d.sender,false);await pc.setRemoteDescription(d.offer);await flush(d.sender);const a=await pc.createAnswer();await pc.setLocalDescription(a);socket.emit("answer",{target:d.sender,answer:pc.localDescription})}catch(e){console.error(e)}});
+socket.on("answer",async d=>{try{const pc=peers.get(d.sender);if(!pc)return;await pc.setRemoteDescription(d.answer);await flush(d.sender)}catch(e){console.error(e)}});
+socket.on("ice-candidate",async d=>{const pc=peers.get(d.sender);if(!pc)return;if(pc.remoteDescription)pc.addIceCandidate(d.candidate).catch(()=>{});else ice.get(d.sender)?.push(d.candidate)});
+async function flush(id){const pc=peers.get(id);for(const c of ice.get(id)||[])try{await pc.addIceCandidate(c)}catch(e){}ice.set(id,[])}
+
+function addVideo(id,s,n,local){let t=$("video-"+id);if(!t){t=document.createElement("div");t.className="tile";t.id="video-"+id;let v=document.createElement("video");v.autoplay=true;v.playsInline=true;v.muted=local;v.srcObject=s;let x=document.createElement("div");x.className="name";x.textContent=local?n+" (You)":n;let q=document.createElement("div");q.className="state";q.textContent=local?"● LOCAL":"● LIVE";t.append(v,x,q);$("videos").append(t)}else t.querySelector("video").srcObject=s;t.querySelector("video").play().catch(()=>{})}
+
+socket.on("participant-joined",async d=>{names.set(d.socketId,d.name);if(meeting?.isHost)await makePeer(d.socketId,true)});
+socket.on("participant-left",d=>{peers.get(d.socketId)?.close();peers.delete(d.socketId);$("video-"+d.socketId)?.remove()});
+socket.on("meeting-ended",()=>{alert("Admin ended the meeting.");cleanup();show("dashboard");refresh()});
+
+$("mic").onclick=()=>{if(!localStream)return;let t=localStream.getAudioTracks(),on=!t[0]?.enabled;t.forEach(x=>x.enabled=on);$("mic").classList.toggle("off",!on);$("mic").textContent=on?"🎙️":"🔇"};
+$("camera").onclick=()=>{if(!localStream)return;let t=localStream.getVideoTracks(),on=!t[0]?.enabled;t.forEach(x=>x.enabled=on);$("camera").classList.toggle("off",!on);$("camera").textContent=on?"📷":"🚫"};
+$("share").onclick=async()=>{try{let d=await navigator.mediaDevices.getDisplayMedia({video:true}),t=d.getVideoTracks()[0];for(const pc of peers.values()){let s=pc.getSenders().find(x=>x.track?.kind==="video");if(s)await s.replaceTrack(t)}let v=$("video-"+socket.id)?.querySelector("video");if(v)v.srcObject=d;t.onended=async()=>{let c=localStream?.getVideoTracks()[0];if(!c)return;for(const pc of peers.values()){let s=pc.getSenders().find(x=>x.track?.kind==="video");if(s)await s.replaceTrack(c)}if(v)v.srcObject=localStream}}catch(e){}};
+$("chatForm").onsubmit=e=>{e.preventDefault();let m=$("chatInput").value.trim();if(m){socket.emit("chat-message",{message:m});$("chatInput").value=""}};
+socket.on("chat-message",d=>{let m=document.createElement("div");m.className="msg";m.innerHTML="<b>"+esc(d.sender)+"</b><div>"+esc(d.message)+"</div>";$("messages").append(m);$("messages").scrollTop=$("messages").scrollHeight});
+$("mobileChat").onclick=()=>$("chat").classList.toggle("open");
+$("copyLink").onclick=async()=>{let u=location.origin+"/?meeting="+meeting.id;try{await navigator.clipboard.writeText(u);alert("Link copied")}catch(e){prompt("Copy:",u)}};
+$("leaveMeeting").onclick=()=>{socket.emit("leave-meeting");cleanup();show("dashboard");refresh()};
+$("endMeeting").onclick=()=>{if(confirm("End meeting for everyone?"))socket.emit("end-meeting")};
+$("logout").onclick=()=>{cleanup();user=null;show("auth")};
+function cleanup(){localStream?.getTracks().forEach(t=>t.stop());localStream=null;peers.forEach(p=>p.close());peers.clear();names.clear();ice.clear();$("videos").innerHTML="";$("messages").innerHTML="";meeting=null}
+const q=new URLSearchParams(location.search).get("meeting");if(q)$("meetingIdInput").value=q.toUpperCase();
+</script>
+</body>
+</html>
