@@ -545,35 +545,22 @@ io.on("connection", (socket) => {
 // HEALTH CHECK
 // ----------------------------------------------------
 
-app.get(
-  "/health",
-  (req, res) => {
-
-    res.json({
-      status: "ok",
-      service: "AICTE SecureMeet",
-      time: new Date().toISOString(),
-      meetings: meetings.size
-    });
-  }
-);
+app.get("/health", (req, res) => {
+  res.json({
+    status: "ok",
+    service: "AICTE SecureMeet",
+    time: new Date().toISOString(),
+    meetings: meetings.size
+  });
+});
 
 // ----------------------------------------------------
 // SPA FALLBACK
 // ----------------------------------------------------
 
-app.use(
-  (req, res) => {
-
-    res.sendFile(
-      path.join(
-        __dirname,
-        "public",
-        "index.html"
-      )
-    );
-  }
-);
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
 
 // ----------------------------------------------------
 // START
