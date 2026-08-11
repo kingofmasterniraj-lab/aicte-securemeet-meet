@@ -18,7 +18,7 @@ const meetings = new Map();
 app.use(express.json());
 app.use((req, res) => {
   res.sendFile(
-    path.join(__dirname, "public", "index.html")
+    path.join(__dirname, "public")
   );
 });
 
